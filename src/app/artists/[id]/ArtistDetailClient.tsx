@@ -281,16 +281,15 @@ export default function ArtistDetailClient({ id }: { id: string }) {
               >
                 {image.imagen ? (
                   <Image 
-                    src={image.imagen}
-                    alt={`Art by ${artist.nombre}`}
-                    fill
-                    style={{ objectFit: 'cover' }}
-                    onError={(e) => {
-                      console.error('Image load error for ID:', image.id);
-                      console.error('Path:', image.imagen);
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
+                  src={`/api/images/${image.id}`}
+                  alt={`Art by ${artist.nombre}`}
+                  fill
+                  style={{ objectFit: 'cover' }}
+                  onError={(e) => {
+                    console.error('Image load error for ID:', image.id);
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
                 ) : (
                   <div className="flex items-center justify-center h-full w-full bg-gray-100">
                     <p className="text-gray-400">Image data missing</p>
@@ -332,7 +331,7 @@ export default function ArtistDetailClient({ id }: { id: string }) {
             </div>
             <div className="relative flex-grow overflow-auto flex items-center justify-center p-4">
               <img 
-                src={selectedImage.imagen}
+                src={`/api/images/${selectedImage.id}`}
                 alt={`Art by ${artist.nombre}`}
                 className="max-w-full max-h-[70vh] object-contain"
               />

@@ -46,3 +46,53 @@ export async function DELETE(request, { params }) {
     return NextResponse.json({ error: 'Failed to delete image' }, { status: 500 });
   }
 }
+
+export async function GET(request, { params }) {
+  try {
+    const imageId = params.id;
+    
+    // Get image path from database
+    const [imageRows] = await pool.query(
+      'SELECT imagen FROM galeria WHERE id = ?',
+      [imageId]
+    );
+    
+    if (imageRows.length === 0) {
+      return NextResponse.json({ error: 'Image not found' }, { status: 404 });
+    }
+    
+    const imagePath = imageRows[0].imagen;
+    // Remove leading slash if present
+    const normalizedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    const fullImagePath = path.join(process.cwd(), 'public', normalizedPath);
+    
+    // Check if file exists
+    if (!fs.existsSync(fullImagePath)) {
+      return NextResponse.json({ error: 'Image file not found', path: fullImagePath }, { status: 404 });
+    }
+    
+    // Read the image and send it with appropriate headers
+    const imageBuffer = await fs.promises.readFile(fullImagePath);
+    const fileExtension = path.extname(imagePath).substring(1).toLowerCase(); // Get extension without dot
+    
+    // Map file extension to MIME type
+    const mimeTypes = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif'
+    };
+    
+    const contentType = mimeTypes[fileExtension] || 'application/octet-stream';
+    
+    return new NextResponse(imageBuffer, {
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
+    });
+  } catch (error) {
+    console.error('Error serving image:', error);
+    return NextResponse.json({ error: 'Failed to serve image' }, { status: 500 });
+  }
+}
