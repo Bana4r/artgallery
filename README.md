@@ -1,37 +1,54 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+## Como usarlo
+Primero deberas enlazarlo a la base de datos, despues para ejecutar el proyecto de next.js puedes hacer lo siguiente
 
-First, run the development server:
+si guieres ejecutar, modificar el codigo y ver los cambios a tiempo real ejecuta:
+```npm run dev```
+si quieres construir el proyecto para ver el resultado ejecuta:
+```npm build```
+si quieres ejecutar el producto final ejecuta:
+```npm start```
+todo esto dentro de la carpeta del proyecto
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Enlazar base de datos
+
+para poder hacerlo primero necesitar un archivo .env o .local.env para poder hacerlo funcionar, en caso de que sea .env deberas ponerle una linea como:
+```.env
+DATABASE_URL=mysql://<usuario_de_la_base_de_datos>:<contraseña>@<direccion_de_la_base_de_datos>:<puerto>/perfectimages
+```
+en caso de que sea .local.env deberas de usar la siguiente estructura
+
+```.local.env
+DB_HOST=Direccion_de_la_base_de_datos
+DB_PORT=Puerto
+DB_USER=Uduario_de_la_base_de_datos
+DB_PASS=contraseña
+DB_NAME=perfectimages
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+la estructura de la base de datos es simple solo copia esto y pegalo en un esquema de base de datos como mysql o mariadb
+```sql
+CREATE DATABASE perfectimages;
+USE perfectimages;
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+CREATE TABLE IF NOT EXISTS artistas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(255) NOT NULL UNIQUE,
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+CREATE TABLE IF NOT EXISTS galeria (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    artista_id INT NOT NULL,
+    imagen LONGBLOB NOT NULL,
+    formato VARCHAR(10) NOT NULL, -- Ejemplo: jpg, png, gif
+    fecha_subida TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (artista_id) REFERENCES artistas(id) ON DELETE CASCADE
+);
+```
 
-## Learn More
+## Despegar en vercel
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+no se puede realizar eso ya que vercel maneja los archivos de forma estatica y no permite la escritura o generacion de estos
 
