@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS artistas (
 CREATE TABLE IF NOT EXISTS galeria (
     id INT AUTO_INCREMENT PRIMARY KEY,
     artista_id INT NOT NULL,
-    imagen LONGBLOB NOT NULL,
+    imagen VARCHAR(255) NOT NULL,
     formato VARCHAR(10) NOT NULL, -- Ejemplo: jpg, png, gif
     fecha_subida TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (artista_id) REFERENCES artistas(id) ON DELETE CASCADE
