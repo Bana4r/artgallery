@@ -28,46 +28,56 @@ export async function POST(
 
     // Process form data
     const formData = await request.formData();
-    const imageFile = formData.get('image');
+    const imageFiles = formData.getAll('images');
 
-    if (!imageFile) {
-      return NextResponse.json({ error: 'No image file provided' }, { status: 400 });
+    if (!imageFiles || imageFiles.length === 0) {
+      return NextResponse.json({ error: 'No image files provided' }, { status: 400 });
     }
 
-    // Validate file type
-    const fileType = imageFile.type.split('/')[1];
-    if (!['jpeg', 'jpg', 'png'].includes(fileType)) {
-      return NextResponse.json({ error: 'Only JPG and PNG formats are supported' }, { status: 400 });
-    }
-
-    // Convert file to buffer
-    const arrayBuffer = await imageFile.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    
-    // Save image to filesystem and get the path
-    const imagePath = await saveImage(buffer, artistId, imageFile.name);
-    
+    const uploadResults = [];
     const currentDate = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-    // Save only the image path to the database
-    const [result] = await pool.query(
-      'INSERT INTO galeria (artista_id, imagen, formato, fecha_subida) VALUES (?, ?, ?, ?)',
-      [artistId, imagePath, fileType, currentDate]
-    );
+    // Process each file
+    for (const imageFile of imageFiles) {
+      // Validate file type
+      const fileType = imageFile.type.split('/')[1];
+      if (!['jpeg', 'jpg', 'png'].includes(fileType)) {
+        continue; // Skip invalid files
+      }
 
-    // Get the inserted ID
-    const newImageId = result.insertId;
+      // Convert file to buffer
+      const arrayBuffer = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
+      // Save image to filesystem and get the path
+      const imagePath = await saveImage(buffer, artistId, imageFile.name);
+      
+      // Save only the image path to the database
+      const [result] = await pool.query(
+        'INSERT INTO galeria (artista_id, imagen, formato, fecha_subida) VALUES (?, ?, ?, ?)',
+        [artistId, imagePath, fileType, currentDate]
+      );
+
+      // Get the inserted ID
+      const newImageId = result.insertId;
+      
+      uploadResults.push({
+        id: newImageId,
+        artista_id: artistId,
+        imagen: imagePath,
+        formato: fileType,
+        fecha_subida: currentDate,
+      });
+    }
+
+    if (uploadResults.length === 0) {
+      return NextResponse.json({ error: 'No valid images were uploaded' }, { status: 400 });
+    }
     
-    return NextResponse.json({
-      id: newImageId,
-      artista_id: artistId,
-      imagen: imagePath,
-      formato: fileType,
-      fecha_subida: currentDate,
-    }, { status: 201 });
+    return NextResponse.json(uploadResults, { status: 201 });
 
   } catch (error) {
-    console.error('Error uploading image:', error);
-    return NextResponse.json({ error: 'Failed to upload image' }, { status: 500 });
+    console.error('Error uploading images:', error);
+    return NextResponse.json({ error: 'Failed to upload images' }, { status: 500 });
   }
 }

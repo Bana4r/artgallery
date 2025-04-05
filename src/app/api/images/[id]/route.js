@@ -6,7 +6,7 @@ import path from 'path';
 export async function DELETE(request, { params }) {
   try {
     const resolvedParams = await params;
-    const imageId = resolvedParams.id;  // Cambiado de artistId a imageId
+    const imageId = resolvedParams.id;
     
     // Validate imageId is a valid number
     if (isNaN(imageId)) {
@@ -24,7 +24,11 @@ export async function DELETE(request, { params }) {
     }
 
     const imagePath = imageRows[0].imagen;
-    const fullImagePath = path.join(process.cwd(), 'public', imagePath);
+    // Normalize path to ensure correct location
+    const normalizedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
+    const fullImagePath = path.join(process.cwd(), 'public', normalizedPath);
+
+    console.log('Deleting image from file system:', fullImagePath);
 
     // Delete from database
     await pool.query('DELETE FROM galeria WHERE id = ?', [imageId]);
@@ -34,6 +38,9 @@ export async function DELETE(request, { params }) {
       // Check if file exists before attempting to delete
       if (fs.existsSync(fullImagePath)) {
         await fs.promises.unlink(fullImagePath);
+        console.log('Successfully deleted file:', fullImagePath);
+      } else {
+        console.warn('File not found for deletion:', fullImagePath);
       }
     } catch (fileError) {
       console.error('Error deleting file:', fileError);
@@ -49,7 +56,9 @@ export async function DELETE(request, { params }) {
 
 export async function GET(request, { params }) {
   try {
-    const imageId = params.id;
+    // Fix: Await params before accessing its properties
+    const resolvedParams = await params;
+    const imageId = resolvedParams.id;
     
     // Get image path from database
     const [imageRows] = await pool.query(

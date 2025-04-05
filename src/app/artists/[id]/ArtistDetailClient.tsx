@@ -105,23 +105,29 @@ export default function ArtistDetailClient({ id }: { id: string }) {
       fileInputRef.current.click();
     }
   };
-
+  
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
     
-    // Check file format
-    const format = file.name.split('.').pop()?.toLowerCase();
-    if (format !== 'jpg' && format !== 'jpeg' && format !== 'png') {
-      alert('Solo se permiten archivos JPG y PNG');
-      return;
-    }
-
     try {
       setUploading(true);
       
       const formData = new FormData();
-      formData.append('image', file);
+      
+      // Append all selected files
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Check file format
+        const format = file.name.split('.').pop()?.toLowerCase();
+        if (format !== 'jpg' && format !== 'jpeg' && format !== 'png') {
+          console.warn(`File "${file.name}" skipped - only JPG and PNG formats are supported`);
+          continue;
+        }
+        
+        formData.append('images', file);
+      }
       
       const response = await fetch(`/api/artists/${id}/upload`, {
         method: 'POST',
@@ -129,17 +135,17 @@ export default function ArtistDetailClient({ id }: { id: string }) {
       });
       
       if (!response.ok) {
-        throw new Error('Error al subir la imagen');
+        throw new Error('Error al subir las imágenes');
       }
       
-      const newImage = await response.json();
+      const newImages = await response.json();
       
-      // Add the new image to the state
-      setImages(prev => [newImage, ...prev]);
+      // Add the new images to the state
+      setImages(prev => [...newImages, ...prev]);
       
     } catch (err) {
-      console.error('Error uploading image:', err);
-      alert('Error al subir la imagen');
+      console.error('Error uploading images:', err);
+      alert('Error al subir las imágenes');
     } finally {
       setUploading(false);
       // Reset file input
@@ -223,33 +229,34 @@ export default function ArtistDetailClient({ id }: { id: string }) {
         </p>
         
         <div className="relative">
-          <button 
-            onClick={handleAddImage}
-            disabled={uploading}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center"
-          >
-            {uploading ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Subiendo...
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-                </svg>
-                Añadir imagen
-              </>
-            )}
-          </button>
+        <button 
+          onClick={handleAddImage}
+          disabled={uploading}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center"
+        >
+          {uploading ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Subiendo...
+            </>
+          ) : (
+            <>
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+              </svg>
+              Añadir imágenes
+            </>
+          )}
+        </button>
           <input 
             ref={fileInputRef}
             type="file" 
             accept=".jpg,.jpeg,.png" 
             onChange={handleFileChange}
+            multiple
             className="hidden"
           />
         </div>
