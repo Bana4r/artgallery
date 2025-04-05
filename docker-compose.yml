@@ -1,5 +1,5 @@
 version: '3.8'
-
+#eviten usar volumes en nextjs, ya que se mesclan los archivos de la app y el contenedor
 services:
   nextjs:
     build: .
@@ -7,17 +7,14 @@ services:
       - "3000:3000"
     depends_on:
       - mysql
-    environment:
-      - DATABASE_URL=mysql://root:1234@mysql:3306/perfectimages
-    volumes:
-      - .:/app
-      - /app/node_modules
+    env_file:
+      - .env 
 
   mysql:
     image: mysql:8
     environment:
-      - MYSQL_ROOT_PASSWORD=1234
-      - MYSQL_DATABASE=perfectimages
+      - MYSQL_ROOT_PASSWORD=${DB_PASS}
+      - MYSQL_DATABASE=${DB_NAME}
     ports:
       - "3306:3306"
     volumes:

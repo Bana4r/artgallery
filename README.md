@@ -68,6 +68,8 @@ const pool = mysql.createPool({
 module.exports = pool;
 ```
 
+aunque siempre se recomienda utilizar un .env para realizar la conexion
+
 ## Despegar en vercel
 
 no se puede realizar eso ya que vercel maneja los archivos de forma estatica y no permite la escritura o generacion de estos
