@@ -51,6 +51,23 @@ CREATE TABLE IF NOT EXISTS galeria (
 );
 ```
 
+## En caso de error al intentar cargar la base de datos
+
+modifica el dodigo de db.js y añade los parametros de tu base de datos despues de "||" como se muestra en el ejemplo
+
+```Js
+const mysql = require('mysql2/promise');
+
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASS || '1234',
+  database: process.env.DB_NAME || 'perfectimages',
+});
+
+module.exports = pool;
+```
+
 ## Despegar en vercel
 
 no se puede realizar eso ya que vercel maneja los archivos de forma estatica y no permite la escritura o generacion de estos
