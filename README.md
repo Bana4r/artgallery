@@ -22,7 +22,7 @@ en caso de que sea .local.env deberas de usar la siguiente estructura
 ```.local.env
 DB_HOST=Direccion_de_la_base_de_datos
 DB_PORT=Puerto
-DB_USER=Uduario_de_la_base_de_datos
+DB_USER=Usuario_de_la_base_de_datos
 DB_PASS=contraseña
 DB_NAME=perfectimages
 ```
