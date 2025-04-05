@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { pool } from '../../../../../../lib/db';
-import { saveImage } from '../../../../../../lib/fileStorage';
+import pool from '@/lib/db';
+import { saveImage } from '@/lib/fileStorage';
 
 export async function POST(
   request,

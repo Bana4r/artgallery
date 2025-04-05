@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { pool } from '../../../../../lib/db';
+import pool from '@/lib/db'; 
 import { unlink } from 'fs/promises';
 import path from 'path';
 
