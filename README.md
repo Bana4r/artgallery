@@ -3,6 +3,9 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 ## Como usarlo
 Primero deberas enlazarlo a la base de datos, despues para ejecutar el proyecto de next.js puedes hacer lo siguiente
 
+instalar los componentes necesario con:
+```npm install```
+
 si guieres ejecutar, modificar el codigo y ver los cambios a tiempo real ejecuta:
 ```npm run dev```
 si quieres construir el proyecto para ver el resultado ejecuta:
