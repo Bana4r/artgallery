@@ -70,6 +70,8 @@ module.exports = pool;
 
 aunque siempre se recomienda utilizar un .env para realizar la conexion
 
+tambien recuerda que debe de ser "mysql" en el host ya que si esta como locahost docker no lo reconocera
+
 ## Despegar en vercel
 
 no se puede realizar eso ya que vercel maneja los archivos de forma estatica y no permite la escritura o generacion de estos
