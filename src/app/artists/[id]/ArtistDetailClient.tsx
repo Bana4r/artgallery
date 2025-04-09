@@ -25,10 +25,12 @@ export default function ArtistDetailClient({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [confirmDeleteModalOpen, setConfirmDeleteModalOpen] = useState<boolean>(false);
   const [imageToDelete, setImageToDelete] = useState<GalleryImage | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
+  const [downloading, setDownloading] = useState<boolean>(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -192,8 +194,107 @@ export default function ArtistDetailClient({ id }: { id: string }) {
   };
 
   const openImageModal = (image: GalleryImage) => {
+    const index = images.findIndex(img => img.id === image.id);
+    setSelectedImageIndex(index);
     setSelectedImage(image);
     setModalOpen(true);
+  };
+
+  // Add functions to navigate between images
+  const goToPreviousImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (images.length <= 1) return;
+    
+    const newIndex = (selectedImageIndex - 1 + images.length) % images.length;
+    setSelectedImageIndex(newIndex);
+    setSelectedImage(images[newIndex]);
+  };
+
+  const goToNextImage = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (images.length <= 1) return;
+    
+    const newIndex = (selectedImageIndex + 1) % images.length;
+    setSelectedImageIndex(newIndex);
+    setSelectedImage(images[newIndex]);
+  };
+
+  // Add keyboard navigation for images
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!modalOpen) return;
+      
+      if (event.key === 'Escape') {
+        setModalOpen(false);
+        setConfirmDeleteModalOpen(false);
+      } else if (event.key === 'ArrowLeft') {
+        const newIndex = (selectedImageIndex - 1 + images.length) % images.length;
+        setSelectedImageIndex(newIndex);
+        setSelectedImage(images[newIndex]);
+      } else if (event.key === 'ArrowRight') {
+        const newIndex = (selectedImageIndex + 1) % images.length;
+        setSelectedImageIndex(newIndex);
+        setSelectedImage(images[newIndex]);
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [modalOpen, selectedImageIndex, images]);
+
+  // Add download all images function
+  const handleDownloadAllImages = async () => {
+    try {
+      setDownloading(true);
+      
+      // Use fetch to get the ZIP file
+      const response = await fetch(`/api/artists/${id}/download`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to download images');
+      }
+      
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Create a URL for the blob
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a temporary link element
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Get the filename from the Content-Disposition header if available
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = `${artist?.nombre.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'artist'}_gallery.zip`;
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1];
+        }
+      }
+      
+      a.download = filename;
+      
+      // Append to the document
+      document.body.appendChild(a);
+      
+      // Trigger the download
+      a.click();
+      
+      // Clean up
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Error downloading images:', err);
+      alert('Error downloading images: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setDownloading(false);
+    }
   };
 
   if (loading) {
@@ -228,37 +329,64 @@ export default function ArtistDetailClient({ id }: { id: string }) {
           Created: {new Date(artist.fecha_creacion).toLocaleDateString()}
         </p>
         
-        <div className="relative">
-        <button 
-          onClick={handleAddImage}
-          disabled={uploading}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center"
-        >
-          {uploading ? (
-            <>
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Subiendo...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
-              </svg>
-              Añadir imágenes
-            </>
-          )}
-        </button>
-          <input 
-            ref={fileInputRef}
-            type="file" 
-            accept=".jpg,.jpeg,.png" 
-            onChange={handleFileChange}
-            multiple
-            className="hidden"
-          />
+        <div className="flex space-x-4">
+          {/* Download All Images Button */}
+          <button 
+            onClick={handleDownloadAllImages}
+            disabled={downloading || images.length === 0}
+            className={`bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md flex items-center ${images.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {downloading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Descargando...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                Descargar todas las imágenes
+              </>
+            )}
+          </button>
+          
+          {/* Add Image Button (existing) */}
+          <div className="relative">
+            <button 
+              onClick={handleAddImage}
+              disabled={uploading}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center"
+            >
+              {uploading ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Subiendo...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                  </svg>
+                  Añadir imágenes
+                </>
+              )}
+            </button>
+            <input 
+              ref={fileInputRef}
+              type="file" 
+              accept=".jpg,.jpeg,.png" 
+              onChange={handleFileChange}
+              multiple
+              className="hidden"
+            />
+          </div>
         </div>
       </div>
 
@@ -321,11 +449,11 @@ export default function ArtistDetailClient({ id }: { id: string }) {
         <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
           <div 
             ref={modalRef} 
-            className="bg-white rounded-lg overflow-hidden max-w-5xl w-full max-h-[90vh] flex flex-col"
+            className="bg-white rounded-lg overflow-hidden max-w-5xl w-full max-h-[90vh] flex flex-col relative"
           >
             <div className="flex justify-between items-center p-4 border-b">
               <h3 className="text-lg font-medium">
-                {artist.nombre}'s Artwork
+                {artist.nombre}'s Artwork ({selectedImageIndex + 1}/{images.length})
               </h3>
               <button 
                 onClick={() => setModalOpen(false)}
@@ -337,11 +465,37 @@ export default function ArtistDetailClient({ id }: { id: string }) {
               </button>
             </div>
             <div className="relative flex-grow overflow-auto flex items-center justify-center p-4">
+              {/* Left navigation arrow */}
+              {images.length > 1 && (
+                <button 
+                  onClick={goToPreviousImage}
+                  className="absolute left-4 bg-white bg-opacity-50 hover:bg-opacity-80 rounded-full p-2 text-gray-800 hover:text-black shadow-md transition-all"
+                  aria-label="Previous image"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+              )}
+
               <img 
                 src={`/api/images/${selectedImage.id}`}
                 alt={`Art by ${artist.nombre}`}
                 className="max-w-full max-h-[70vh] object-contain"
               />
+
+              {/* Right navigation arrow */}
+              {images.length > 1 && (
+                <button 
+                  onClick={goToNextImage}
+                  className="absolute right-4 bg-white bg-opacity-50 hover:bg-opacity-80 rounded-full p-2 text-gray-800 hover:text-black shadow-md transition-all"
+                  aria-label="Next image"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              )}
             </div>
             <div className="p-4 border-t">
               <p>Uploaded: {new Date(selectedImage.fecha_subida).toLocaleDateString()}</p>
