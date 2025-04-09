@@ -1,5 +1,5 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-
+# ESTA VERSION ESTA HECHA PARA USARSE EN JENKINS, SI NO LO TIENES CONFIGURADO USA MAIN EN DADO CASO, SOLO SE AÑADEN ARCHIVOS DE .ENV Y JENKINSFILE
 ## Como usarlo
 Primero deberas enlazarlo a la base de datos, despues para ejecutar el proyecto de next.js puedes hacer lo siguiente
 
