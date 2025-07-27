@@ -11,10 +11,7 @@ Instalar los componentes necesarios con:
 npm install
 ```
 
-Inicializar la base de datos SQLite:
-```bash
-npm run init-db
-```
+La base de datos SQLite se inicializa automáticamente al ejecutar la aplicación, por lo que ya no necesitas ejecutar comandos adicionales.
 
 Si quieres ejecutar, modificar el código y ver los cambios a tiempo real ejecuta:
 ```bash
@@ -39,6 +36,7 @@ Este proyecto utiliza SQLite como base de datos, lo que significa que:
 
 - **No necesitas instalar ningún servidor de base de datos**
 - **La base de datos es un archivo local** (`database.sqlite`)
+- **Se inicializa automáticamente** al ejecutar la aplicación
 - **Es perfecta para desarrollo y proyectos pequeños a medianos**
 - **Fácil de respaldar** (solo copia el archivo)
 
@@ -55,7 +53,7 @@ Si no especificas nada, se usará `database.sqlite` en la raíz del proyecto.
 
 ### Estructura de la base de datos
 
-La base de datos se inicializa automáticamente con el comando `npm run init-db` y crea las siguientes tablas:
+La base de datos se inicializa automáticamente cuando se ejecuta la aplicación (`npm run dev` o `npm start`) y crea las siguientes tablas:
 
 ```sql
 -- Tabla de artistas
