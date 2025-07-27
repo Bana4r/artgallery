@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import pool from '@/lib/db'; 
+import { getDatabase } from '@/lib/db'; 
 import fs from 'fs';
 import path from 'path';
 
@@ -15,8 +15,10 @@ export async function POST(request) {
       errors: []
     };
 
+    const db = await getDatabase();
+    
     // Get all image records from database
-    const [imageRows] = await pool.query(
+    const imageRows = await db.all(
       'SELECT id, imagen FROM galeria'
     );
 
@@ -41,7 +43,7 @@ export async function POST(request) {
         // Uncomment below to enable automatic removal of broken references
         /*
         try {
-          await pool.query('DELETE FROM galeria WHERE id = ?', [id]);
+          await db.run('DELETE FROM galeria WHERE id = ?', [id]);
           console.log(`Removed broken reference from DB: image ID ${id}`);
         } catch (err) {
           console.error(`Failed to remove broken reference from DB: image ID ${id}`, err);

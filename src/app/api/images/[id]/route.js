@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import pool from '@/lib/db'; 
+import { getDatabase } from '@/lib/db'; 
 import fs from 'fs';
 import path from 'path';
 
@@ -13,17 +13,19 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Invalid image ID' }, { status: 400 });
     }
 
+    const db = await getDatabase();
+    
     // First, get the image path from the database
-    const [imageRows] = await pool.query(
+    const imageRow = await db.get(
       'SELECT imagen FROM galeria WHERE id = ?',
       [imageId]
     );
 
-    if (imageRows.length === 0) {
+    if (!imageRow) {
       return NextResponse.json({ error: 'Image not found' }, { status: 404 });
     }
 
-    const imagePath = imageRows[0].imagen;
+    const imagePath = imageRow.imagen;
     // Normalize path to ensure correct location
     const normalizedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     const fullImagePath = path.join(process.cwd(), 'public', normalizedPath);
@@ -31,7 +33,7 @@ export async function DELETE(request, { params }) {
     console.log('Deleting image from file system:', fullImagePath);
 
     // Delete from database
-    await pool.query('DELETE FROM galeria WHERE id = ?', [imageId]);
+    await db.run('DELETE FROM galeria WHERE id = ?', [imageId]);
 
     // Delete the file from the filesystem
     try {
@@ -60,17 +62,19 @@ export async function GET(request, { params }) {
     const resolvedParams = await params;
     const imageId = resolvedParams.id;
     
+    const db = await getDatabase();
+    
     // Get image path from database
-    const [imageRows] = await pool.query(
+    const imageRow = await db.get(
       'SELECT imagen FROM galeria WHERE id = ?',
       [imageId]
     );
     
-    if (imageRows.length === 0) {
+    if (!imageRow) {
       return NextResponse.json({ error: 'Image not found' }, { status: 404 });
     }
     
-    const imagePath = imageRows[0].imagen;
+    const imagePath = imageRow.imagen;
     // Remove leading slash if present
     const normalizedPath = imagePath.startsWith('/') ? imagePath.substring(1) : imagePath;
     const fullImagePath = path.join(process.cwd(), 'public', normalizedPath);

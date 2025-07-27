@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import { getDatabase } from '@/lib/db';
 import JSZip from 'jszip';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -16,23 +16,25 @@ export async function GET(request, { params }) {
       );
     }
 
+    const db = await getDatabase();
+    
     // Get artist info to name the zip file
-    const [artistRows] = await pool.query(
+    const artistRow = await db.get(
       'SELECT nombre FROM artistas WHERE id = ?',
       [artistId]
     );
 
-    if (!artistRows || artistRows.length === 0) {
+    if (!artistRow) {
       return NextResponse.json(
         { error: 'Artist not found' },
         { status: 404 }
       );
     }
 
-    const artistName = artistRows[0].nombre;
+    const artistName = artistRow.nombre;
 
     // Get all images for this artist
-    const [rows] = await pool.query(
+    const rows = await db.all(
       'SELECT id, imagen, formato, fecha_subida FROM galeria WHERE artista_id = ?',
       [artistId]
     );

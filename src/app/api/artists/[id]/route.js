@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import pool from '@/lib/db'; 
+import { getDatabase } from '@/lib/db'; 
 import { unlink } from 'fs/promises';
 import path from 'path';
 
@@ -16,19 +16,20 @@ export async function GET(request, { params }) {
       );
     }
 
-    const [rows] = await pool.query(
+    const db = await getDatabase();
+    const artist = await db.get(
       'SELECT id, nombre, fecha_creacion FROM artistas WHERE id = ?',
       [artistId]
     );
 
-    if (rows.length === 0) {
+    if (!artist) {
       return NextResponse.json(
         { error: 'Artist not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(rows[0]);
+    return NextResponse.json(artist);
   } catch (error) {
     console.error('Database Error:', error);
     return NextResponse.json(
@@ -62,13 +63,15 @@ export async function PUT(request, { params }) {
       );
     }
 
+    const db = await getDatabase();
+    
     // Check if artist exists
-    const [checkRows] = await pool.query(
+    const checkArtist = await db.get(
       'SELECT id FROM artistas WHERE id = ?',
       [artistId]
     );
 
-    if (checkRows.length === 0) {
+    if (!checkArtist) {
       return NextResponse.json(
         { error: 'Artist not found' },
         { status: 404 }
@@ -76,18 +79,18 @@ export async function PUT(request, { params }) {
     }
 
     // Update artist name
-    await pool.query(
+    await db.run(
       'UPDATE artistas SET nombre = ? WHERE id = ?',
       [nombre, artistId]
     );
 
     // Return updated artist
-    const [updatedRows] = await pool.query(
+    const updatedArtist = await db.get(
       'SELECT id, nombre, fecha_creacion FROM artistas WHERE id = ?',
       [artistId]
     );
 
-    return NextResponse.json(updatedRows[0]);
+    return NextResponse.json(updatedArtist);
   } catch (error) {
     console.error('Database Error:', error);
     return NextResponse.json(
@@ -110,13 +113,15 @@ export async function DELETE(request, { params }) {
       );
     }
 
+    const db = await getDatabase();
+    
     // Check if artist exists
-    const [checkRows] = await pool.query(
+    const checkArtist = await db.get(
       'SELECT id FROM artistas WHERE id = ?',
       [artistId]
     );
 
-    if (checkRows.length === 0) {
+    if (!checkArtist) {
       return NextResponse.json(
         { error: 'Artist not found' },
         { status: 404 }
@@ -124,7 +129,7 @@ export async function DELETE(request, { params }) {
     }
 
     // First, get all images associated with the artist
-    const [images] = await pool.query(
+    const images = await db.all(
       'SELECT imagen FROM galeria WHERE artista_id = ?',
       [artistId]
     );
@@ -146,13 +151,13 @@ export async function DELETE(request, { params }) {
     await Promise.all(deletePromises);
 
     // Delete database records for images
-    await pool.query(
+    await db.run(
       'DELETE FROM galeria WHERE artista_id = ?',
       [artistId]
     );
 
     // Then delete the artist
-    await pool.query(
+    await db.run(
       'DELETE FROM artistas WHERE id = ?',
       [artistId]
     );

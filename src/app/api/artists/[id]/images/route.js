@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import { getDatabase } from '@/lib/db';
 
 export async function GET(request, { params }) {
   try {
@@ -14,7 +14,8 @@ export async function GET(request, { params }) {
       );
     }
 
-    const [rows] = await pool.query(
+    const db = await getDatabase();
+    const rows = await db.all(
       'SELECT id, artista_id, imagen, formato, fecha_subida FROM galeria WHERE artista_id = ? ORDER BY fecha_subida DESC',
       [artistId]
     );

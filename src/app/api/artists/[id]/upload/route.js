@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import pool from '@/lib/db';
+import { getDatabase } from '@/lib/db';
 import { saveImage } from '@/lib/fileStorage';
 
 export async function POST(
@@ -16,13 +16,15 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid artist ID' }, { status: 400 });
     }
 
+    const db = await getDatabase();
+    
     // Check if artist exists
-    const [artistRows] = await pool.query(
+    const artistRow = await db.get(
       'SELECT id FROM artistas WHERE id = ?',
       [artistId]
     );
 
-    if (artistRows.length === 0) {
+    if (!artistRow) {
       return NextResponse.json({ error: 'Artist not found' }, { status: 404 });
     }
 
@@ -53,13 +55,13 @@ export async function POST(
       const imagePath = await saveImage(buffer, artistId, imageFile.name);
       
       // Save only the image path to the database
-      const [result] = await pool.query(
+      const result = await db.run(
         'INSERT INTO galeria (artista_id, imagen, formato, fecha_subida) VALUES (?, ?, ?, ?)',
         [artistId, imagePath, fileType, currentDate]
       );
 
       // Get the inserted ID
-      const newImageId = result.insertId;
+      const newImageId = result.lastID;
       
       uploadResults.push({
         id: newImageId,

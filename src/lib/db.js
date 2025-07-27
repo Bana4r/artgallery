@@ -1,10 +1,22 @@
-const mysql = require('mysql2/promise');
+const sqlite3 = require('sqlite3').verbose();
+const { open } = require('sqlite');
+const path = require('path');
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || '',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASS || '1234',
-  database: process.env.DB_NAME || 'perfectimages',
-});
+let db = null;
 
-module.exports = pool;
+async function getDatabase() {
+  if (!db) {
+    const dbPath = process.env.DB_PATH || path.join(process.cwd(), 'database.sqlite');
+    
+    db = await open({
+      filename: dbPath,
+      driver: sqlite3.Database
+    });
+
+    // Habilitar foreign keys
+    await db.exec('PRAGMA foreign_keys = ON;');
+  }
+  return db;
+}
+
+module.exports = { getDatabase };
