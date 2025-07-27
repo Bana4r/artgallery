@@ -1,78 +1,96 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Como usarlo
-Primero deberas enlazarlo a la base de datos, despues para ejecutar el proyecto de next.js puedes hacer lo siguiente
 
-instalar los componentes necesario con:
-```npm install```
+Este proyecto ahora utiliza SQLite como base de datos, lo que lo hace mucho más simple de configurar ya que no requiere un servidor de base de datos externo.
 
-si guieres ejecutar, modificar el codigo y ver los cambios a tiempo real ejecuta:
-```npm run dev```
-si quieres construir el proyecto para ver el resultado ejecuta:
-```npm build```
-si quieres ejecutar el producto final ejecuta:
-```npm start```
-todo esto dentro de la carpeta del proyecto
+Para ejecutar el proyecto de Next.js puedes hacer lo siguiente:
 
-## Enlazar base de datos
-
-para poder hacerlo primero necesitar un archivo .env o .local.env para poder hacerlo funcionar, en caso de que sea .env deberas ponerle una linea como:
-```.env
-DATABASE_URL=mysql://<usuario_de_la_base_de_datos>:<contraseña>@<direccion_de_la_base_de_datos>:<puerto>/perfectimages
-```
-en caso de que sea .local.env deberas de usar la siguiente estructura
-
-```.local.env
-DB_HOST=Direccion_de_la_base_de_datos
-DB_PORT=Puerto
-DB_USER=Usuario_de_la_base_de_datos
-DB_PASS=contraseña
-DB_NAME=perfectimages
+Instalar los componentes necesarios con:
+```bash
+npm install
 ```
 
-la estructura de la base de datos es simple solo copia esto y pegalo en un esquema de base de datos como mysql o mariadb
+Inicializar la base de datos SQLite:
+```bash
+npm run init-db
+```
+
+Si quieres ejecutar, modificar el código y ver los cambios a tiempo real ejecuta:
+```bash
+npm run dev
+```
+
+Si quieres construir el proyecto para ver el resultado ejecuta:
+```bash
+npm run build
+```
+
+Si quieres ejecutar el producto final ejecuta:
+```bash
+npm start
+```
+
+Todo esto dentro de la carpeta del proyecto.
+
+## Base de datos SQLite
+
+Este proyecto utiliza SQLite como base de datos, lo que significa que:
+
+- **No necesitas instalar ningún servidor de base de datos**
+- **La base de datos es un archivo local** (`database.sqlite`)
+- **Es perfecta para desarrollo y proyectos pequeños a medianos**
+- **Fácil de respaldar** (solo copia el archivo)
+
+### Configuración opcional
+
+Si quieres especificar una ruta personalizada para la base de datos, puedes crear un archivo `.env`:
+
+```env
+# Opcional: especifica la ruta de la base de datos SQLite
+DB_PATH=./mi_base_de_datos.sqlite
+```
+
+Si no especificas nada, se usará `database.sqlite` en la raíz del proyecto.
+
+### Estructura de la base de datos
+
+La base de datos se inicializa automáticamente con el comando `npm run init-db` y crea las siguientes tablas:
+
 ```sql
-CREATE DATABASE perfectimages;
-USE perfectimages;
-
-CREATE TABLE IF NOT EXISTS artistas (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nombre VARCHAR(255) NOT NULL UNIQUE,
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+-- Tabla de artistas
+CREATE TABLE artistas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS galeria (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    artista_id INT NOT NULL,
-    imagen VARCHAR(255) NOT NULL,
-    formato VARCHAR(10) NOT NULL, -- Ejemplo: jpg, png, gif
-    fecha_subida TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+-- Tabla de galería de imágenes
+CREATE TABLE galeria (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    artista_id INTEGER NOT NULL,
+    imagen TEXT NOT NULL,
+    formato TEXT NOT NULL,
+    fecha_subida DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (artista_id) REFERENCES artistas(id) ON DELETE CASCADE
 );
 ```
 
-## En caso de error al intentar cargar la base de datos
+## Ventajas de SQLite
 
-modifica el dodigo de db.js y añade los parametros de tu base de datos despues de "||" como se muestra en el ejemplo
+- ✅ **Sin configuración de servidor**: No necesitas MySQL, PostgreSQL u otro servidor
+- ✅ **Portabilidad**: La base de datos es un solo archivo
+- ✅ **Rendimiento**: Excelente para aplicaciones pequeñas y medianas
+- ✅ **Simplicidad**: Fácil de respaldar y migrar
+- ✅ **Sin dependencias externas**: Todo funciona localmente
 
-```Js
-const mysql = require('mysql2/promise');
+## Despliegue
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASS || '1234',
-  database: process.env.DB_NAME || 'perfectimages',
-});
+Para despliegue en producción, considera:
 
-module.exports = pool;
-```
+- **Vercel**: Funciona bien con SQLite para aplicaciones pequeñas
+- **Railway/Render**: Excelentes opciones para aplicaciones con SQLite
+- **VPS tradicional**: Funciona perfectamente
 
-aunque siempre se recomienda utilizar un .env para realizar la conexion
-
-tambien recuerda que debe de ser "mysql" en el host ya que si esta como locahost docker no lo reconocera
-
-## Despegar en vercel
-
-no se puede realizar eso ya que vercel maneja los archivos de forma estatica y no permite la escritura o generacion de estos
+Para aplicaciones más grandes, puedes migrar fácilmente a PostgreSQL u otra base de datos más robusta cuando sea necesario.
 
