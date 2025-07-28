@@ -82,13 +82,5 @@ CREATE TABLE galeria (
 - ✅ **Simplicidad**: Fácil de respaldar y migrar
 - ✅ **Sin dependencias externas**: Todo funciona localmente
 
-## Despliegue
-
-Para despliegue en producción, considera:
-
-- **Vercel**: Funciona bien con SQLite para aplicaciones pequeñas
-- **Railway/Render**: Excelentes opciones para aplicaciones con SQLite
-- **VPS tradicional**: Funciona perfectamente
-
 Para aplicaciones más grandes, puedes migrar fácilmente a PostgreSQL u otra base de datos más robusta cuando sea necesario.
 
