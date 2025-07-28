@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import OptimizedImage from '@/components/OptimizedImage';
 
 interface Artist {
   id: number;
@@ -24,6 +25,7 @@ export default function ArtistDetailClient({ id }: { id: string }) {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<{current: number, total: number}>({current: 0, total: 0});
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
@@ -31,6 +33,11 @@ export default function ArtistDetailClient({ id }: { id: string }) {
   const [imageToDelete, setImageToDelete] = useState<GalleryImage | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
   const [downloading, setDownloading] = useState<boolean>(false);
+  const [imageRefreshKey, setImageRefreshKey] = useState<number>(Date.now());
+  const [preloadedImages, setPreloadedImages] = useState<Set<number>>(new Set());
+  const [visibleImages, setVisibleImages] = useState<GalleryImage[]>([]);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [imagesPerPage] = useState<number>(20);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -56,6 +63,9 @@ export default function ArtistDetailClient({ id }: { id: string }) {
         
         const imagesData = await imagesResponse.json();
         setImages(imagesData);
+        
+        // Initialize visible images for pagination
+        setVisibleImages(imagesData.slice(0, imagesPerPage));
       } catch (err) {
         setError('Failed to load artist data');
         console.error(err);
@@ -65,7 +75,14 @@ export default function ArtistDetailClient({ id }: { id: string }) {
     }
 
     fetchArtistAndImages();
-  }, [id]);
+  }, [id, imagesPerPage]);
+
+  // Effect to handle pagination when images change
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * imagesPerPage;
+    const endIndex = startIndex + imagesPerPage;
+    setVisibleImages(images.slice(startIndex, endIndex));
+  }, [images, currentPage, imagesPerPage]);
 
   // Handle clicks outside modal to close it
   useEffect(() => {
@@ -114,8 +131,10 @@ export default function ArtistDetailClient({ id }: { id: string }) {
     
     try {
       setUploading(true);
+      setUploadProgress({current: 0, total: files.length});
       
       const formData = new FormData();
+      let validFileCount = 0;
       
       // Append all selected files
       for (let i = 0; i < files.length; i++) {
@@ -129,7 +148,14 @@ export default function ArtistDetailClient({ id }: { id: string }) {
         }
         
         formData.append('images', file);
+        validFileCount++;
       }
+      
+      if (validFileCount === 0) {
+        throw new Error('No se encontraron archivos de imagen válidos');
+      }
+      
+      setUploadProgress({current: 0, total: validFileCount});
       
       const response = await fetch(`/api/artists/${id}/upload`, {
         method: 'POST',
@@ -145,17 +171,38 @@ export default function ArtistDetailClient({ id }: { id: string }) {
       // Add the new images to the state
       setImages(prev => [...newImages, ...prev]);
       
+      // Force refresh of image cache
+      setImageRefreshKey(Date.now());
+      
     } catch (err) {
       console.error('Error uploading images:', err);
-      alert('Error al subir las imágenes');
+      alert('Error al subir las imágenes: ' + (err instanceof Error ? err.message : 'Error desconocido'));
     } finally {
       setUploading(false);
+      setUploadProgress({current: 0, total: 0});
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   };
+
+  // Effect to handle image array changes and maintain modal consistency
+  useEffect(() => {
+    if (modalOpen && selectedImage && images.length > 0) {
+      // Verify that the selected image still exists in the current images array
+      const currentIndex = images.findIndex(img => img.id === selectedImage.id);
+      if (currentIndex === -1) {
+        // Selected image no longer exists, close modal
+        setModalOpen(false);
+        setSelectedImage(null);
+        setSelectedImageIndex(0);
+      } else if (currentIndex !== selectedImageIndex) {
+        // Update index if it has changed due to array modifications
+        setSelectedImageIndex(currentIndex);
+      }
+    }
+  }, [images, modalOpen, selectedImage, selectedImageIndex]);
 
   // New functions for delete functionality
   const openDeleteConfirmation = (image: GalleryImage, event: React.MouseEvent) => {
@@ -179,7 +226,35 @@ export default function ArtistDetailClient({ id }: { id: string }) {
       }
       
       // Remove the image from our state
-      setImages(prev => prev.filter(img => img.id !== imageToDelete.id));
+      const newImages = images.filter(img => img.id !== imageToDelete.id);
+      setImages(newImages);
+      
+      // Force refresh of image cache
+      setImageRefreshKey(Date.now());
+      
+      // If we're in modal view and deleted image was the selected one, handle navigation
+      if (modalOpen && selectedImage?.id === imageToDelete.id) {
+        if (newImages.length === 0) {
+          // No images left, close modal
+          setModalOpen(false);
+          setSelectedImage(null);
+          setSelectedImageIndex(0);
+        } else {
+          // Find new image to show
+          let newIndex = selectedImageIndex;
+          if (newIndex >= newImages.length) {
+            newIndex = newImages.length - 1;
+          }
+          setSelectedImageIndex(newIndex);
+          setSelectedImage(newImages[newIndex]);
+        }
+      } else if (modalOpen && selectedImage) {
+        // Update selected image index if it shifted due to deletion
+        const newSelectedIndex = newImages.findIndex(img => img.id === selectedImage.id);
+        if (newSelectedIndex !== -1) {
+          setSelectedImageIndex(newSelectedIndex);
+        }
+      }
       
       // Close the modal
       setConfirmDeleteModalOpen(false);
@@ -195,9 +270,63 @@ export default function ArtistDetailClient({ id }: { id: string }) {
 
   const openImageModal = (image: GalleryImage) => {
     const index = images.findIndex(img => img.id === image.id);
+    if (index === -1) {
+      console.error('Image not found in current images array');
+      return;
+    }
     setSelectedImageIndex(index);
     setSelectedImage(image);
     setModalOpen(true);
+    
+    // Preload adjacent images for smooth navigation
+    preloadAdjacentImages(index);
+  };
+
+  const preloadAdjacentImages = (currentIndex: number) => {
+    const imagesToPreload = [];
+    
+    // Preload previous image
+    if (currentIndex > 0) {
+      imagesToPreload.push(images[currentIndex - 1].id);
+    }
+    
+    // Preload next image
+    if (currentIndex < images.length - 1) {
+      imagesToPreload.push(images[currentIndex + 1].id);
+    }
+    
+    imagesToPreload.forEach(imageId => {
+      if (!preloadedImages.has(imageId)) {
+        const img = new window.Image();
+        img.src = `/api/images/${imageId}?v=${imageRefreshKey}`;
+        img.onload = () => {
+          setPreloadedImages(prev => new Set(prev).add(imageId));
+        };
+      }
+    });
+  };
+
+  // Pagination functions
+  const totalPages = Math.ceil(images.length / imagesPerPage);
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      // Scroll to top of gallery
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const loadMoreImages = () => {
+    if (currentPage < totalPages) {
+      const nextPage = currentPage + 1;
+      const startIndex = (nextPage - 1) * imagesPerPage;
+      const endIndex = startIndex + imagesPerPage;
+      const newImages = images.slice(startIndex, endIndex);
+      
+      setVisibleImages(prev => [...prev, ...newImages]);
+      setCurrentPage(nextPage);
+    }
   };
 
   // Add functions to navigate between images
@@ -206,8 +335,11 @@ export default function ArtistDetailClient({ id }: { id: string }) {
     if (images.length <= 1) return;
     
     const newIndex = (selectedImageIndex - 1 + images.length) % images.length;
-    setSelectedImageIndex(newIndex);
-    setSelectedImage(images[newIndex]);
+    if (newIndex >= 0 && newIndex < images.length) {
+      setSelectedImageIndex(newIndex);
+      setSelectedImage(images[newIndex]);
+      preloadAdjacentImages(newIndex);
+    }
   };
 
   const goToNextImage = (e: React.MouseEvent) => {
@@ -215,26 +347,35 @@ export default function ArtistDetailClient({ id }: { id: string }) {
     if (images.length <= 1) return;
     
     const newIndex = (selectedImageIndex + 1) % images.length;
-    setSelectedImageIndex(newIndex);
-    setSelectedImage(images[newIndex]);
+    if (newIndex >= 0 && newIndex < images.length) {
+      setSelectedImageIndex(newIndex);
+      setSelectedImage(images[newIndex]);
+      preloadAdjacentImages(newIndex);
+    }
   };
 
   // Add keyboard navigation for images
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (!modalOpen) return;
+      if (!modalOpen || images.length === 0) return;
       
       if (event.key === 'Escape') {
         setModalOpen(false);
         setConfirmDeleteModalOpen(false);
       } else if (event.key === 'ArrowLeft') {
         const newIndex = (selectedImageIndex - 1 + images.length) % images.length;
-        setSelectedImageIndex(newIndex);
-        setSelectedImage(images[newIndex]);
+        if (newIndex >= 0 && newIndex < images.length) {
+          setSelectedImageIndex(newIndex);
+          setSelectedImage(images[newIndex]);
+          preloadAdjacentImages(newIndex);
+        }
       } else if (event.key === 'ArrowRight') {
         const newIndex = (selectedImageIndex + 1) % images.length;
-        setSelectedImageIndex(newIndex);
-        setSelectedImage(images[newIndex]);
+        if (newIndex >= 0 && newIndex < images.length) {
+          setSelectedImageIndex(newIndex);
+          setSelectedImage(images[newIndex]);
+          preloadAdjacentImages(newIndex);
+        }
       }
     }
 
@@ -359,7 +500,11 @@ export default function ArtistDetailClient({ id }: { id: string }) {
             <button 
               onClick={handleAddImage}
               disabled={uploading}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md flex items-center"
+              className={`${
+                uploading 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-500 hover:bg-blue-600'
+              } text-white px-4 py-2 rounded-md flex items-center transition-colors duration-200`}
             >
               {uploading ? (
                 <>
@@ -367,7 +512,7 @@ export default function ArtistDetailClient({ id }: { id: string }) {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  Subiendo...
+                  Procesando...
                 </>
               ) : (
                 <>
@@ -385,6 +530,7 @@ export default function ArtistDetailClient({ id }: { id: string }) {
               onChange={handleFileChange}
               multiple
               className="hidden"
+              disabled={uploading}
             />
           </div>
         </div>
@@ -395,53 +541,107 @@ export default function ArtistDetailClient({ id }: { id: string }) {
           No images available for this artist.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {images.map((image) => (
-            <div key={image.id} className="bg-white shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300 relative">
-              {/* Delete button - positioned in the top right */}
-              <button 
-                onClick={(e) => openDeleteConfirmation(image, e)}
-                className="absolute top-2 right-2 z-10 bg-red-500 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-md transition-colors"
-                title="Delete image"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-              
-              {/* Image container */}
-              <div 
-                className="relative h-48 w-full cursor-pointer" 
-                onClick={() => openImageModal(image)}
-              >
-                {image.imagen ? (
-                  <Image 
-                  src={`/api/images/${image.id}`}
-                  alt={`Art by ${artist.nombre}`}
-                  fill
-                  style={{ objectFit: 'cover' }}
-                  onError={(e) => {
-                    console.error('Image load error for ID:', image.id);
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
-                ) : (
-                  <div className="flex items-center justify-center h-full w-full bg-gray-100">
-                    <p className="text-gray-400">Image data missing</p>
-                  </div>
-                )}
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {visibleImages.map((image) => (
+              <div key={image.id} className="bg-white shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300 relative">
+                {/* Delete button - positioned in the top right */}
+                <button 
+                  onClick={(e) => openDeleteConfirmation(image, e)}
+                  className="absolute top-2 right-2 z-10 bg-red-500 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-md transition-colors"
+                  title="Delete image"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+                
+                {/* Image container */}
+                <div 
+                  className="relative h-48 w-full cursor-pointer" 
+                  onClick={() => openImageModal(image)}
+                >
+                  {image.imagen ? (
+                    <OptimizedImage
+                      imageId={image.id}
+                      alt={`Art by ${artist.nombre}`}
+                      className="w-full h-full"
+                      onClick={() => openImageModal(image)}
+                      refreshKey={imageRefreshKey}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-center h-full w-full bg-gray-100">
+                      <p className="text-gray-400">Image data missing</p>
+                    </div>
+                  )}
+                </div>
+                <div className="p-4">
+                  <p className="text-sm text-gray-500">
+                    Uploaded: {new Date(image.fecha_subida).toLocaleDateString()}
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Format: {image.formato?.toUpperCase() || 'Unknown'}
+                  </p>
+                </div>
               </div>
-              <div className="p-4">
-                <p className="text-sm text-gray-500">
-                  Uploaded: {new Date(image.fecha_subida).toLocaleDateString()}
-                </p>
-                <p className="text-sm text-gray-500">
-                  Format: {image.formato?.toUpperCase() || 'Unknown'}
-                </p>
+            ))}
+          </div>
+
+          {/* Pagination Controls */}
+          {images.length > imagesPerPage && (
+            <div className="mt-8 flex flex-col items-center space-y-4">
+              {/* Load More Button (Infinite Scroll Style) */}
+              {visibleImages.length < images.length && (
+                <button
+                  onClick={loadMoreImages}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors duration-200"
+                >
+                  Cargar más imágenes ({images.length - visibleImages.length} restantes)
+                </button>
+              )}
+
+              {/* Page Numbers */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Anterior
+                </button>
+                
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  const page = i + 1;
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => handlePageChange(page)}
+                      className={`px-3 py-1 rounded ${
+                        currentPage === page
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 hover:bg-gray-300'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+                
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Siguiente
+                </button>
               </div>
+
+              <p className="text-sm text-gray-500">
+                Mostrando {visibleImages.length} de {images.length} imágenes
+              </p>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {/* Modal for displaying full-size images */}
@@ -479,7 +679,7 @@ export default function ArtistDetailClient({ id }: { id: string }) {
               )}
 
               <img 
-                src={`/api/images/${selectedImage.id}`}
+                src={`/api/images/${selectedImage.id}?v=${imageRefreshKey}`}
                 alt={`Art by ${artist.nombre}`}
                 className="max-w-full max-h-[70vh] object-contain"
               />
@@ -549,6 +749,42 @@ export default function ArtistDetailClient({ id }: { id: string }) {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Loading Overlay */}
+      {uploading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-8 shadow-2xl max-w-md w-full mx-4">
+            <div className="text-center">
+              <div className="mb-4">
+                <svg className="animate-spin mx-auto h-12 w-12 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                Subiendo imágenes...
+              </h3>
+              <p className="text-gray-600 mb-4">
+                Por favor espera mientras procesamos tus imágenes
+              </p>
+              {uploadProgress.total > 0 && (
+                <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300" 
+                    style={{width: `${(uploadProgress.current / uploadProgress.total) * 100}%`}}
+                  ></div>
+                </div>
+              )}
+              <p className="text-sm text-gray-500">
+                {uploadProgress.total > 0 
+                  ? `Procesando ${uploadProgress.total} imagen${uploadProgress.total > 1 ? 's' : ''}...`
+                  : 'Iniciando subida...'
+                }
+              </p>
             </div>
           </div>
         </div>

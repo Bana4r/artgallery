@@ -98,10 +98,26 @@ export async function GET(request, { params }) {
     
     const contentType = mimeTypes[fileExtension] || 'application/octet-stream';
     
+    // Get file stats for ETag and Last-Modified
+    const stats = await fs.promises.stat(fullImagePath);
+    const lastModified = stats.mtime.toUTCString();
+    const etag = `"${imageId}-${stats.mtime.getTime()}"`;
+    
+    // Check if client has cached version
+    const ifNoneMatch = request.headers.get('if-none-match');
+    const ifModifiedSince = request.headers.get('if-modified-since');
+    
+    if (ifNoneMatch === etag || ifModifiedSince === lastModified) {
+      return new NextResponse(null, { status: 304 });
+    }
+    
     return new NextResponse(imageBuffer, {
       headers: {
         'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable',
+        'Cache-Control': 'public, max-age=3600, must-revalidate',
+        'ETag': etag,
+        'Last-Modified': lastModified,
+        'Content-Length': stats.size.toString(),
       },
     });
   } catch (error) {
