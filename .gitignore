@@ -37,6 +37,10 @@ coverage/
 public/uploads/*
 !public/uploads/.gitkeep
 
+# Thumbnails generados automáticamente
+public/thumbnails/*
+!public/thumbnails/.gitkeep
+
 # Cache de Next.js
 .next/
 .vercel/
