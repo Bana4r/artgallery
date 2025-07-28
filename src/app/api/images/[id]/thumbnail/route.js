@@ -45,13 +45,17 @@ export async function GET(request, { params }) {
     // Check if thumbnail already exists
     if (!fs.existsSync(thumbnailPath)) {
       try {
-        // Generate thumbnail using Sharp
+        // Generate thumbnail using Sharp with optimized settings
         await sharp(fullImagePath)
           .resize(300, 300, {
             fit: 'cover',
             position: 'center'
           })
-          .jpeg({ quality: 80 })
+          .jpeg({ 
+            quality: 85, // Slightly higher quality
+            progressive: true, // Progressive JPEG for faster perceived loading
+            mozjpeg: true // Use mozjpeg encoder for better compression
+          })
           .toFile(thumbnailPath);
       } catch (sharpError) {
         console.error('Error generating thumbnail:', sharpError);
@@ -74,8 +78,9 @@ export async function GET(request, { params }) {
     return new NextResponse(thumbnailBuffer, {
       headers: {
         'Content-Type': 'image/jpeg',
-        'Cache-Control': 'public, max-age=86400, must-revalidate',
+        'Cache-Control': 'public, max-age=2592000, immutable', // 30 días de cache
         'ETag': `"thumb-${imageId}-${Date.now()}"`,
+        'Content-Length': thumbnailBuffer.length.toString(),
       },
     });
   } catch (error) {

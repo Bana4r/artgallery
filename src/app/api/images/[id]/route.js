@@ -118,6 +118,7 @@ export async function GET(request, { params }) {
         'ETag': etag,
         'Last-Modified': lastModified,
         'Content-Length': stats.size.toString(),
+        'Accept-Ranges': 'bytes', // Enable range requests for better streaming
       },
     });
   } catch (error) {

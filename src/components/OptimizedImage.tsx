@@ -11,6 +11,7 @@ interface OptimizedImageProps {
   style?: React.CSSProperties;
   priority?: boolean;
   refreshKey?: number;
+  useHighQuality?: boolean; // Nueva prop para forzar alta calidad
 }
 
 export default function OptimizedImage({ 
@@ -20,10 +21,12 @@ export default function OptimizedImage({
   onClick, 
   style, 
   priority = false,
-  refreshKey = 0
+  refreshKey = 0,
+  useHighQuality = false
 }: OptimizedImageProps) {
   const [isInView, setIsInView] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [highQualityLoaded, setHighQualityLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const imgRef = useRef<HTMLDivElement>(null);
 
@@ -55,6 +58,10 @@ export default function OptimizedImage({
     setImageLoaded(true);
   };
 
+  const handleHighQualityLoad = () => {
+    setHighQualityLoaded(true);
+  };
+
   const handleImageError = () => {
     setImageError(true);
     console.error('Image load error for ID:', imageId);
@@ -63,6 +70,10 @@ export default function OptimizedImage({
   // Build image URLs
   const thumbnailUrl = `/api/images/${imageId}/thumbnail?v=${refreshKey}`;
   const fullImageUrl = `/api/images/${imageId}?v=${refreshKey}`;
+
+  // Determine which image to show based on context
+  const shouldUseHighQuality = useHighQuality || priority;
+  const initialImageUrl = shouldUseHighQuality ? fullImageUrl : thumbnailUrl;
 
   return (
     <div 
@@ -73,7 +84,7 @@ export default function OptimizedImage({
     >
       {!isInView && !priority ? (
         // Placeholder while not in view
-        <div className="w-full h-full bg-gray-200 animate-pulse flex items-center justify-center">
+        <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 animate-pulse flex items-center justify-center">
           <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
           </svg>
@@ -90,26 +101,46 @@ export default function OptimizedImage({
         </div>
       ) : (
         <>
-          {/* Loading skeleton */}
+          {/* Enhanced loading skeleton */}
           {!imageLoaded && (
-            <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-200 via-gray-100 to-gray-200 animate-pulse">
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-pulse" 
+                   style={{ animationDuration: '1.5s' }} />
+            </div>
           )}
           
           {/* Optimized Image */}
           <Image
-            src={priority ? fullImageUrl : thumbnailUrl}
+            src={initialImageUrl}
             alt={alt}
             fill
             style={{ objectFit: 'cover' }}
             onLoad={handleImageLoad}
             onError={handleImageError}
             priority={priority}
-            quality={priority ? 90 : 80}
+            quality={shouldUseHighQuality ? 90 : 75}
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             className={`transition-opacity duration-300 ${
               imageLoaded ? 'opacity-100' : 'opacity-0'
             }`}
           />
+
+          {/* Progressive enhancement: Load high quality version for thumbnails */}
+          {!shouldUseHighQuality && imageLoaded && isInView && (
+            <Image
+              src={fullImageUrl}
+              alt={alt}
+              fill
+              style={{ objectFit: 'cover' }}
+              onLoad={handleHighQualityLoad}
+              onError={() => {}} // Ignore errors for high quality version
+              quality={90}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              className={`transition-opacity duration-500 ${
+                highQualityLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
+          )}
         </>
       )}
     </div>

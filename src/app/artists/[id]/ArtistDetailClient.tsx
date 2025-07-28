@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import OptimizedImage from '@/components/OptimizedImage';
+import AdvancedImageViewer from '@/components/AdvancedImageViewer';
 
 interface Artist {
   id: number;
@@ -29,6 +30,7 @@ export default function ArtistDetailClient({ id }: { id: string }) {
   const [selectedImage, setSelectedImage] = useState<GalleryImage | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [modalOpen, setModalOpen] = useState<boolean>(false);
+  const [useAdvancedViewer, setUseAdvancedViewer] = useState<boolean>(true);
   const [confirmDeleteModalOpen, setConfirmDeleteModalOpen] = useState<boolean>(false);
   const [imageToDelete, setImageToDelete] = useState<GalleryImage | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
@@ -82,7 +84,21 @@ export default function ArtistDetailClient({ id }: { id: string }) {
     const startIndex = (currentPage - 1) * imagesPerPage;
     const endIndex = startIndex + imagesPerPage;
     setVisibleImages(images.slice(startIndex, endIndex));
-  }, [images, currentPage, imagesPerPage]);
+    
+    // Preload thumbnails for better performance
+    preloadThumbnails(images.slice(startIndex, endIndex));
+  }, [images, currentPage, imagesPerPage, imageRefreshKey]);
+
+  // Preload thumbnails for faster loading
+  const preloadThumbnails = (imagesToPreload: GalleryImage[]) => {
+    imagesToPreload.forEach((image, index) => {
+      // Preload first 6 images immediately
+      if (index < 6) {
+        const img = new window.Image();
+        img.src = `/api/images/${image.id}/thumbnail?v=${imageRefreshKey}`;
+      }
+    });
+  };
 
   // Handle clicks outside modal to close it
   useEffect(() => {
@@ -330,8 +346,7 @@ export default function ArtistDetailClient({ id }: { id: string }) {
   };
 
   // Add functions to navigate between images
-  const goToPreviousImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const goToPreviousImage = () => {
     if (images.length <= 1) return;
     
     const newIndex = (selectedImageIndex - 1 + images.length) % images.length;
@@ -342,8 +357,7 @@ export default function ArtistDetailClient({ id }: { id: string }) {
     }
   };
 
-  const goToNextImage = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const goToNextImage = () => {
     if (images.length <= 1) return;
     
     const newIndex = (selectedImageIndex + 1) % images.length;
@@ -471,6 +485,30 @@ export default function ArtistDetailClient({ id }: { id: string }) {
         </p>
         
         <div className="flex space-x-4">
+          {/* Viewer Mode Toggle */}
+          <div className="flex items-center bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setUseAdvancedViewer(false)}
+              className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                !useAdvancedViewer
+                  ? 'bg-white shadow-sm text-blue-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Visor Simple
+            </button>
+            <button
+              onClick={() => setUseAdvancedViewer(true)}
+              className={`px-3 py-1 rounded-md text-sm transition-colors ${
+                useAdvancedViewer
+                  ? 'bg-white shadow-sm text-blue-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              Visor Avanzado
+            </button>
+          </div>
+
           {/* Download All Images Button */}
           <button 
             onClick={handleDownloadAllImages}
@@ -543,7 +581,7 @@ export default function ArtistDetailClient({ id }: { id: string }) {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {visibleImages.map((image) => (
+            {visibleImages.map((image, index) => (
               <div key={image.id} className="bg-white shadow-md rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-300 relative">
                 {/* Delete button - positioned in the top right */}
                 <button 
@@ -568,6 +606,8 @@ export default function ArtistDetailClient({ id }: { id: string }) {
                       className="w-full h-full"
                       onClick={() => openImageModal(image)}
                       refreshKey={imageRefreshKey}
+                      priority={index < 6} // Priorizar las primeras 6 imágenes
+                      useHighQuality={index < 3} // Alta calidad para las primeras 3
                     />
                   ) : (
                     <div className="flex items-center justify-center h-full w-full bg-gray-100">
@@ -644,8 +684,26 @@ export default function ArtistDetailClient({ id }: { id: string }) {
         </>
       )}
 
-      {/* Modal for displaying full-size images */}
-      {modalOpen && selectedImage && (
+      {/* Modal for displaying full-size images with Advanced Viewer */}
+      {modalOpen && selectedImage && useAdvancedViewer && (
+        <AdvancedImageViewer
+          imageUrl={`/api/images/${selectedImage.id}?v=${imageRefreshKey}`}
+          alt={`Art by ${artist.nombre}`}
+          onClose={() => setModalOpen(false)}
+          onPrevious={images.length > 1 ? goToPreviousImage : undefined}
+          onNext={images.length > 1 ? goToNextImage : undefined}
+          hasNavigation={images.length > 1}
+          imageIndex={selectedImageIndex}
+          totalImages={images.length}
+          imageMetadata={{
+            format: selectedImage.formato,
+            uploadDate: selectedImage.fecha_subida
+          }}
+        />
+      )}
+
+      {/* Fallback Modal for Basic View */}
+      {modalOpen && selectedImage && !useAdvancedViewer && (
         <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
           <div 
             ref={modalRef} 
@@ -655,20 +713,29 @@ export default function ArtistDetailClient({ id }: { id: string }) {
               <h3 className="text-lg font-medium">
                 {artist.nombre}'s Artwork ({selectedImageIndex + 1}/{images.length})
               </h3>
-              <button 
-                onClick={() => setModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setUseAdvancedViewer(true)}
+                  className="text-blue-600 hover:text-blue-700 text-sm"
+                  title="Cambiar a visor avanzado"
+                >
+                  Visor Avanzado
+                </button>
+                <button 
+                  onClick={() => setModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
             <div className="relative flex-grow overflow-auto flex items-center justify-center p-4">
               {/* Left navigation arrow */}
               {images.length > 1 && (
                 <button 
-                  onClick={goToPreviousImage}
+                  onClick={() => goToPreviousImage()}
                   className="absolute left-4 bg-white bg-opacity-50 hover:bg-opacity-80 rounded-full p-2 text-gray-800 hover:text-black shadow-md transition-all"
                   aria-label="Previous image"
                 >
@@ -687,7 +754,7 @@ export default function ArtistDetailClient({ id }: { id: string }) {
               {/* Right navigation arrow */}
               {images.length > 1 && (
                 <button 
-                  onClick={goToNextImage}
+                  onClick={() => goToNextImage()}
                   className="absolute right-4 bg-white bg-opacity-50 hover:bg-opacity-80 rounded-full p-2 text-gray-800 hover:text-black shadow-md transition-all"
                   aria-label="Next image"
                 >
